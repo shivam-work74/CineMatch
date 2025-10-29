@@ -7,13 +7,11 @@ import toast from 'react-hot-toast';
 import useAuthStore from '../store/authStore';
 import api, { setAuthToken } from '../lib/api';
 import { initializeSocket, disconnectSocket, socket } from '../lib/socket';
-import MovieSwipeCard from '../components/MovieSwipeCard'; // Uses the <img> tag version
+import MovieSwipeCard from '../components/MovieSwipeCard';
 import MatchModal from '../components/MatchModal';
-import ParallaxBackground from '../components/ParallaxBackground'; // Import the new background
+import ParallaxBackground from '../components/ParallaxBackground';
 
-// --- Sidebar Component Definition (Included Here) ---
 const SessionSidebar = ({ participants = [], joinCode }) => {
-  // Ensure participants is always an array
   const safeParticipants = Array.isArray(participants) ? participants : [];
 
   return (
@@ -21,7 +19,7 @@ const SessionSidebar = ({ participants = [], joinCode }) => {
       initial={{ x: 100, opacity: 0 }}
       animate={{ x: 0, opacity: 1 }}
       transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
-      className="fixed top-0 right-0 h-screen w-full max-w-xs p-4 z-30" // Ensure z-index
+      className="fixed top-0 right-0 h-screen w-full max-w-xs p-4 z-30"
     >
       <div className="h-full w-full rounded-2xl border border-white/10
                       bg-white/5 p-6 shadow-2xl backdrop-blur-xl
@@ -40,7 +38,6 @@ const SessionSidebar = ({ participants = [], joinCode }) => {
         >
           {joinCode || '...'}
         </div>
-
         <h3 className="text-xl font-semibold text-white mb-4 flex items-center gap-2">
           <Users className="h-5 w-5" />
           Participants ({safeParticipants.length})
@@ -62,10 +59,8 @@ const SessionSidebar = ({ participants = [], joinCode }) => {
       </div>
     </motion.div>
   );
-}; // End SessionSidebar
+};
 
-
-// --- Main Session Page Component ---
 function SessionPage() {
   const { joinCode } = useParams();
   const navigate = useNavigate();
@@ -81,7 +76,6 @@ function SessionPage() {
 
   const controls = useAnimationControls();
 
-  // --- Core Logic: Load Session & Movies, Connect Socket ---
   useEffect(() => {
     if (!token) return navigate('/login');
     setAuthToken(token);
@@ -92,13 +86,11 @@ function SessionPage() {
       try {
         const sessionRes = await api.get(`/sessions/${joinCode}`);
         setSession(sessionRes.data.session);
-        setParticipants(sessionRes.data.session.participants || []); // Ensure array
+        setParticipants(sessionRes.data.session.participants || []);
 
         const moviesRes = await api.get('/movies/popular');
         const popularMovies = moviesRes.data || [];
-        // Set movies for swiping (reverse for stack)
         setMovies(popularMovies.slice(0, 10).reverse());
-        // Set DIFFERENT movies for the background parallax
         setBackgroundMovies(popularMovies.slice(10, 20));
 
         socket.emit('join_session', { joinCode });
@@ -111,52 +103,33 @@ function SessionPage() {
         setIsLoading(false);
       }
     };
-
     loadSessionData();
 
-    // --- Socket Listeners ---
     socket.on('session_updated', ({ participants: updatedParticipants }) => {
-       setParticipants(updatedParticipants || []); // Ensure array
+       setParticipants(updatedParticipants || []);
        toast('A new user joined the session!');
      });
     socket.on('match_found', (movie) => {
-      console.log("Match received from socket:", movie); // Debug log
       setMatchedMovie(movie);
       setShowMatchModal(true);
     });
 
-    // --- Cleanup ---
     return () => {
-      console.log('Disconnecting socket on unmount');
       disconnectSocket();
       socket.off('session_updated');
       socket.off('match_found');
     };
   }, [joinCode, token, navigate]);
 
-  // --- Swipe Handlers ---
   const handleSwipe = (direction, movie) => {
-     // Check if movie object is valid before proceeding
-     if (!movie || !movie.id) {
-       console.error("handleSwipe called with invalid movie object:", movie);
-       return;
-     }
-     console.log(`Handling swipe ${direction} for movie ID: ${movie.id}`); // Debug log
+     if (!movie || !movie.id) return;
 
-     // Optimistically remove the card using functional update
      setMovies((prevMovies) => {
-        // Ensure prevMovies is an array
         if (!Array.isArray(prevMovies)) return [];
         const index = prevMovies.findIndex(m => m.id === movie.id);
-        if (index === -1) {
-            console.log(`Movie ID ${movie.id} not found in state, possibly already removed.`); // Debug log
-            return prevMovies; // Already removed or not found
-        }
-        console.log(`Removing movie ID ${movie.id} at index ${index}`); // Debug log
-        // Create a new array without the swiped movie
+        if (index === -1) return prevMovies;
         return [...prevMovies.slice(0, index), ...prevMovies.slice(index + 1)];
     });
-
 
     if (direction === 'right') {
       socket.emit('send_swipe', {
@@ -168,74 +141,46 @@ function SessionPage() {
     }
   };
 
-  // --- Trigger Swipe via Buttons ---
   const triggerSwipe = async (direction) => {
-     // Read state directly within the function
      const currentMovies = movies;
-     if (!Array.isArray(currentMovies) || currentMovies.length === 0) {
-        console.log("triggerSwipe called but no movies left."); // Debug log
-        return; // No cards left
-     }
+     if (!Array.isArray(currentMovies) || currentMovies.length === 0) return;
      const topCardMovie = currentMovies[currentMovies.length - 1];
-     console.log(`Triggering swipe ${direction} for top card:`, topCardMovie?.title); // Debug log
-
 
     const exitX = direction === 'right' ? 300 : -300;
-
     try {
-      // Animate the top card out
       await controls.start({
-        x: exitX,
-        opacity: 0,
-        scale: 0.8,
+        x: exitX, opacity: 0, scale: 0.8,
         transition: { duration: 0.3, ease: "easeIn" }
       });
-
-      // Call the original swipe handler AFTER animation completes
       handleSwipe(direction, topCardMovie);
+      // Reset controls for the NEXT card instantly
+       controls.start({ x: 0, opacity: 1, scale: 1, transition: { duration: 0 } });
+       // Manually setting y and scale might be needed if initial/animate interfere
+       controls.set({ y: 0, scale: 1 });
 
-      // IMPORTANT: Reset controls for the *next* card that appears
-      controls.start({ x: 0, opacity: 1, scale: 1, transition: { duration: 0 } });
 
-    } catch (error) {
-       console.error("Error during triggerSwipe animation:", error);
-       // Still try to handle the swipe if animation fails
-       handleSwipe(direction, topCardMovie);
-    }
+    } catch (error) { handleSwipe(direction, topCardMovie); }
   };
 
-
-  // --- Render Loading State ---
   if (isLoading) {
-    return (
-      <div className="relative flex h-screen w-full flex-col items-center justify-center overflow-hidden p-4 pt-8">
-         <ParallaxBackground movies={backgroundMovies} />
-         <Loader2 className="h-16 w-16 animate-spin text-white z-10" />
-      </div>
-    );
-  }
+     return (
+       <div className="relative flex h-screen w-full flex-col items-center justify-center overflow-hidden p-4 pt-8">
+          <ParallaxBackground movies={backgroundMovies} />
+          <Loader2 className="h-16 w-16 animate-spin text-white z-10" />
+       </div>
+     );
+   }
 
-  // --- Render Main Page ---
   return (
     <div className="relative flex h-screen w-full flex-col items-center justify-center overflow-hidden p-4 pt-8">
-
-      {/* --- Background --- */}
       <ParallaxBackground movies={backgroundMovies} />
-
-      {/* --- Match Modal --- */}
       <div className="z-50">
-        <MatchModal
-          show={showMatchModal}
-          movie={matchedMovie}
-          onClose={() => setShowMatchModal(false)}
-        />
+        <MatchModal show={showMatchModal} movie={matchedMovie} onClose={() => setShowMatchModal(false)} />
       </div>
-
-      {/* --- Sidebar --- */}
-      <SessionSidebar participants={participants} joinCode={joinCode || ''} />
-
-      {/* --- Card Stack Container --- */}
-      <div className="relative h-[600px] w-full max-w-sm flex-grow flex items-center justify-center z-20">
+      <div className="z-30">
+        <SessionSidebar participants={participants} joinCode={joinCode || ''} />
+      </div>
+      <div className="relative h-[600px] w-full max-w-sm flex-grow flex items-center justify-center z-10">
         <AnimatePresence>
           {movies && movies.length > 0 ? (
             movies.map((movie, index) => (
@@ -244,8 +189,9 @@ function SessionPage() {
                 movie={movie}
                 onSwipeRight={() => handleSwipe('right', movie)}
                 onSwipeLeft={() => handleSwipe('left', movie)}
-                // Apply controls ONLY to the top card
                 controls={index === movies.length - 1 ? controls : undefined}
+                index={index}
+                totalCards={movies.length}
               />
             ))
           ) : (
@@ -253,7 +199,7 @@ function SessionPage() {
                key="all-done-card"
                initial={{ opacity: 0, scale: 0.8 }}
                animate={{ opacity: 1, scale: 1 }}
-               exit={{ opacity: 0, scale: 0.8 }} // Added exit for consistency
+               exit={{ opacity: 0, scale: 0.8 }}
                className="absolute inset-0 h-full w-full rounded-2xl border border-white/10
                           bg-white/5 p-8 shadow-2xl backdrop-blur-xl
                           flex flex-col items-center justify-center text-center"
@@ -265,15 +211,12 @@ function SessionPage() {
           )}
         </AnimatePresence>
       </div>
-
-      {/* --- Swipe Buttons --- */}
-       <motion.div
-          className="mt-8 flex gap-6 z-40" // High z-index
+      <motion.div
+          className="mt-8 flex gap-6 z-40"
           initial={{ opacity: 0, y: 50 }}
           animate={movies.length > 0 ? { opacity: 1, y: 0 } : { opacity: 0, y: 50 }}
           transition={{ delay: 0.2, duration: 0.5 }}
         >
-        {/* Nope Button */}
         <button
           onClick={() => triggerSwipe('left')}
           disabled={movies.length === 0}
@@ -285,8 +228,6 @@ function SessionPage() {
         >
           <XIcon className="h-10 w-10" strokeWidth={3} />
         </button>
-
-        {/* Like Button */}
         <button
           onClick={() => triggerSwipe('right')}
           disabled={movies.length === 0}
@@ -299,7 +240,6 @@ function SessionPage() {
           <Heart className="h-10 w-10" fill="currentColor" strokeWidth={1}/>
         </button>
       </motion.div>
-
     </div>
   );
 }
