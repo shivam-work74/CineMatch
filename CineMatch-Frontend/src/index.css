@@ -1,0 +1,111 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+  This is the magic for the "Aurora" background.
+  We apply it to the <body> tag itself.
+*/
+@layer base {
+  body {
+    @apply bg-zinc-900 text-zinc-100;
+    
+    /* Set up the gradient */
+    background-image: linear-gradient(
+      -45deg,
+      #007aff, /* Brand Blue */
+      #5856d6, /* Indigo */
+      #ff2d55, /* Red */
+      #ff9500  /* Orange */
+    );
+    
+    /* Set the gradient size */
+    background-size: 400% 400%;
+
+    /* --- THIS IS THE FIX ---
+      We apply the 'animate-aurora' utility class that
+      we defined in our tailwind.config.js file.
+    */
+    @apply animate-aurora;
+
+    /* Font smoothing */
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+}
+/* --- Add this to the bottom of src/index.css --- */
+
+@layer utilities {
+  /* We add our custom marquee animation */
+  @keyframes marquee {
+    0% { transform: translateX(0%); }
+    100% { transform: translateX(-100%); }
+  }
+  
+  .animate-marquee {
+    animation: marquee 60s linear infinite;
+  }
+  
+  .animate-marquee-reverse {
+  	animation: marquee 60s linear infinite reverse;
+  }
+}
+/* --- Add this to the bottom of src/index.css --- */
+
+@layer base {
+  /* --- New Starfield Background for Session Page --- */
+  .starfield-bg {
+    @apply bg-gradient-to-b from-zinc-900 via-indigo-950 to-black; /* Base gradient */
+    position: relative;
+    overflow: hidden;
+  }
+
+  .stars {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100%;
+    height: 100%;
+    display: block;
+    background: transparent url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyMDAwIiBoZWlnaHQ9IjIwMDAiPgo8ZGVmcz4KPHJhZGlhbEdyYWRpZW50IGlkPSJnIiBncmFkaWVudFVuaXRzPSJ1c2VyU3BhY2VPblVzZSIgY3g9IjUwJSIgY3k9IjUwJSIgcj0iNTAlIj4KPHN0b3Agb2Zmc2V0PSIwIiBzdG9wLWNvbG9yPSJyZ2JhKDI1NSwyNTUsMjU1LDAuOCkiLz4KPHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSJyZ2JhKDI1NSwyNTUsMjU1LDApIi8+CjwvcmFkaWFsR3JhZGllbnQ+CjwvZGVmcz4KPGNpcmNsZSBjeD0iMTAwMCIgY3k9IjEwMDAiIHI9IjEiIGZpbGw9InVybCgjZykiLz4KPGNpcmNsZSBjeD0iMjAwIiBjeT0iODAwIiByPSIxIiBmaWxsPSJ1cmwoI2cpIi8+CjxjaXJjbGUgY3g9IjE1MDAiIGN5PSI0MDAiIHI9IjEiIGZpbGw9InVybCgjZykiLz4KPGNpcmNsZSBjeD0iNzAwIiBjeT0iMTIwMCIgcj0iMiIgZmlsbD0idXJsKCNnKSIvPgo8Y2lyY2xlIGN4PSIxODAwIiBjeT0iMTYwMCIgcj0iMiIgZmlsbD0idXJsKCNnKSIvPgo8Y2lyY2xlIGN4PSIxMjAwIiBjeT0iMTkwMCIgcj0iMSIgZmlsbD0idXJsKCNnKSIvPgo8Y2lyY2xlIGN4PSI0MDAiIGN5PSIyMDAiIHI9IjEiIGZpbGw9InVybCgjZykiLz4KPGNpcmNsZSBjeD0iMTEwMCIgY3k9IjYwMCIgcj0iMSIgZmlsbD0idXJsKCNnKSIvPgo8Y2lyY2xlIGN4PSIxOTAwIiBjeT0iOTAwIiByPSIyIiBmaWxsPSJ1cmwoI2cpIi8+CjxjaXJjbGUgY3g9IjUwMCIgY3k9IjE3MDAiIHI9IjEiIGZpbGw9InVybCgjZykiLz4KPC9zdmc+') repeat center center;
+    background-size: 1000px 1000px; /* Adjust size of the star pattern */
+    animation: move-twink-back 200s linear infinite;
+  }
+  .stars2 {
+    background-size: 1500px 1500px; /* Larger, slower pattern */
+    animation: move-twink-back 150s linear infinite;
+    opacity: 0.7;
+  }
+  .stars3 {
+    background-size: 500px 500px; /* Smaller, faster pattern */
+    animation: move-twink-back 100s linear infinite;
+    opacity: 0.5;
+  }
+
+  @keyframes move-twink-back {
+    from { background-position: 0 0; }
+    to { background-position: -10000px 5000px; } /* Adjust movement vector */
+  }
+}
+/* --- Add this to the bottom of src/index.css --- */
+
+@layer components {
+  /* --- New Cinematic Parallax Background --- */
+  .parallax-bg {
+    @apply fixed inset-0 z-[-1] overflow-hidden bg-zinc-900; /* Fixed position behind everything */
+  }
+  .parallax-layer {
+    @apply absolute inset-0 bg-cover bg-center opacity-0 transition-opacity duration-1000 ease-in-out;
+    animation: slow-pan 60s linear infinite alternate; /* Slow panning animation */
+  }
+  .parallax-layer.active {
+    @apply opacity-20; /* Low opacity for subtle effect */
+  }
+
+  @keyframes slow-pan {
+    0% { background-position: 0% 50%; }
+    100% { background-position: 100% 50%; }
+  }
+}
