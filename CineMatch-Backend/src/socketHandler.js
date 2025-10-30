@@ -1,150 +1,150 @@
-// --- WebSocket (Socket.io) Handler ---
-// This file manages all real-time events like joining, swiping, and matching
+// --- WebSocket (Socket.io) Handler (MERGED + POSTER_PATH FIX) ---
+// Manages real-time events, ensures poster_path is handled correctly
 
 const jwt = require('jsonwebtoken');
 const User = require('./models/User');
 const Session = require('./models/Session');
 
-// We will export a function that takes 'io' (our socket server)
-// as an argument.
 module.exports = function(io) {
-  
+
   // --- 1. Socket Authentication Middleware ---
-  // This is our "security guard" for WebSockets.
-  // It runs *once* when a user first connects.
   io.use(async (socket, next) => {
     try {
-      // The frontend will send the token in this 'auth' object
       const token = socket.handshake.auth.token;
-      
       if (!token) {
         return next(new Error('Authentication error: No token provided.'));
       }
-
-      // Verify the token
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
-      
-      // Find the user
       const user = await User.findById(decoded.id).select('id name');
-      
       if (!user) {
         return next(new Error('Authentication error: User not found.'));
       }
-      
-      // --- SUCCESS ---
-      // We attach the user to the socket object for this connection
       socket.user = user;
       next();
-      
     } catch (error) {
+      // Improved error logging for token issues
+      console.error('Socket Auth Error:', error.message);
       next(new Error('Authentication error: Invalid token.'));
     }
   });
 
   // --- 2. Main Connection Logic ---
-  // This runs *after* the authentication middleware is successful.
   io.on('connection', (socket) => {
     console.log(`Socket connected: ${socket.id} (User: ${socket.user.name})`);
 
     // --- Event Handler: "join_session" ---
-    // This is called when a user loads the Session Page
     socket.on('join_session', async ({ joinCode }) => {
       try {
-        const session = await Session.findOne({ 
-          joinCode 
+        if (!joinCode) {
+            console.log(`Join attempt failed: No joinCode provided by ${socket.user.name}.`);
+            return; // Exit if no code provided
+        }
+        const session = await Session.findOne({
+          joinCode: joinCode.toUpperCase()
         }).populate('participants', 'id name');
-        
-        if (!session) return;
-        
-        // Security check: Is this user actually in the session?
-        if (!session.participants.some(p => p.id === socket.user.id)) {
-          return; // Not a participant, do nothing
+
+        if (!session) {
+            console.log(`Join attempt failed: Session ${joinCode} not found.`);
+            return;
         }
 
-        // --- SUCCESS ---
-        // 'socket.join()' puts this user into a private "room"
-        // named after the joinCode (e.g., "AB12CD")
+        if (!session.participants.some(p => p.id === socket.user.id)) {
+          console.log(`Join attempt failed: User ${socket.user.name} not in session ${joinCode}.`);
+          return;
+        }
+
         socket.join(joinCode);
         console.log(`User ${socket.user.name} joined room: ${joinCode}`);
-        
-        // Tell *everyone* in that room (including the sender)
-        // the new, updated list of participants
-        io.to(joinCode).emit('session_updated', { 
-          participants: session.participants 
+
+        io.to(joinCode).emit('session_updated', {
+          participants: session.participants,
+          matches: session.matches || [] // Ensure matches is an array
         });
 
       } catch (error) {
-        console.error('Join Session Error:', error);
+        console.error(`Error in join_session for ${joinCode}:`, error);
       }
     });
 
     // --- Event Handler: "send_swipe" ---
-    // This is called when a user swipes "like" (right)
-    socket.on('send_swipe', async ({ joinCode, movieId, movieTitle, posterPath }) => {
+    socket.on('send_swipe', async ({ joinCode, movieId, movieTitle, posterPath }) => { // Receives posterPath
       try {
         const userId = socket.user.id;
-        
-        // Find the session
-        const session = await Session.findOne({ joinCode });
-        if (!session) return;
 
-        // Check if user already liked this movie (prevent double-swipes)
-        const existingLike = session.likes.find(
-          like => like.userId.toString() === userId && like.movieId === movieId
-        );
-        
-        if (existingLike) {
-          console.log('User already liked this movie');
+        if (!joinCode || !movieId) {
+             console.log(`Swipe failed: Missing joinCode or movieId from ${userId}.`);
+             return; // Essential data missing
+        }
+
+        const session = await Session.findOne({ joinCode: joinCode.toUpperCase() });
+        if (!session) {
+            console.log(`Swipe failed: Session ${joinCode} not found.`);
+            return;
+        }
+        if (!session.participants.some(p => p.toString() === userId)) {
+             console.log(`Swipe failed: User ${userId} not in session ${joinCode}.`);
+             return;
+         }
+
+        const alreadyLiked = session.likes.some(like => like.userId.toString() === userId && like.movieId === movieId);
+        if (alreadyLiked) {
+          console.log(`User ${userId} already liked movie ${movieId}.`);
           return;
         }
 
-        // --- Add the new like to the array ---
         session.likes.push({ movieId, userId });
 
-        // --- THE "TOP-NOTCH" MATCH LOGIC ---
-        // 1. Get all participant IDs in the session
         const participantIds = session.participants.map(p => p.toString());
-        
-        // 2. Get all likes *for this specific movie*
-        const movieLikes = session.likes.filter(
-          like => like.movieId === movieId
-        );
-        
-        // 3. Get the user IDs of everyone who liked it
+        // Ensure participantIds is not empty before proceeding
+        if (participantIds.length === 0) {
+             console.log(`Swipe processed for ${movieId}, but no participants in session ${joinCode} to check for match.`);
+             await session.save(); // Save the like even if no one else is there
+             return;
+        }
+
+        const movieLikes = session.likes.filter(like => like.movieId === movieId);
         const likingUserIds = movieLikes.map(like => like.userId.toString());
-        
-        // 4. Check if *every* participant ID is in the "likers" list
         const isMatch = participantIds.every(id => likingUserIds.includes(id));
 
-        // --- IT'S A MATCH! ---
+        let matchAdded = false;
         if (isMatch) {
-          console.log(`--- MATCH FOUND: ${movieTitle} ---`);
-          
-          // Add movie to the session's 'matches' array
-          session.matches.push({ movieId, title: movieTitle, poster_path: posterPath });
-          
-          // --- BROADCAST THE MATCH! ---
-          // Send a "match_found" event to *everyone* in the room
-          io.to(joinCode).emit('match_found', { 
-            movieId, 
-            title: movieTitle, 
-            poster_path: posterPath 
-          });
+          const alreadyMatched = session.matches.some(m => m.movieId === movieId);
+          if (!alreadyMatched) {
+            console.log(`--- MATCH FOUND in ${joinCode}: ${movieTitle} ---`);
+            // --- MERGED FIX: Save posterPath correctly (use null if undefined/falsy) ---
+            session.matches.push({
+                movieId,
+                title: movieTitle || 'Unknown Title',
+                poster_path: posterPath || null // Store null if posterPath is missing/undefined
+            });
+            matchAdded = true;
+          } else {
+             console.log(`Movie ${movieId} already matched in ${joinCode}.`);
+          }
         }
-        
-        // Save the new like (and potential match) to the database
+
         await session.save();
-        
+        console.log(`Session ${joinCode} saved. Match added: ${matchAdded}`);
+
+        // If a new match was added, broadcast the updated list
+        if (matchAdded) {
+          io.to(joinCode).emit('match_update', {
+             matches: session.matches
+          });
+           console.log(`Emitted match_update for ${joinCode} with ${session.matches.length} matches.`);
+        }
+
       } catch (error) {
-        console.error('Send Swipe Error:', error);
+        console.error(`Error in send_swipe for ${joinCode}, movie ${movieId}:`, error);
       }
     });
 
     // --- Event Handler: "disconnect" ---
     socket.on('disconnect', () => {
       console.log(`Socket disconnected: ${socket.id} (User: ${socket.user.name})`);
-      // We could add logic here to update the participant list,
-      // but for now, we'll just let them re-join.
+      // Optional: Add logic here to find sessions user was in,
+      // remove them from participants, save session, and emit 'session_updated'
+      // to remaining users in those rooms.
     });
   });
 };
