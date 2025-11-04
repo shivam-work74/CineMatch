@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: cinematch-backend
+    env: node
+    buildCommand: cd CineMatch-Backend && npm install
+    startCommand: cd CineMatch-Backend && npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+    healthCheckPath: /api/test

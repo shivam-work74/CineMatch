@@ -19,6 +19,7 @@ const initializeSocket = require('./src/socketHandler');
 // --- Initialization ---
 const app = express();
 const server = http.createServer(app);
+// Use the PORT from environment variables or default to 3001
 const PORT = process.env.PORT || 3001;
 
 // --- Database Connection ---
@@ -82,6 +83,6 @@ initializeSocket(io);
 
 
 // --- Start Server ---
-server.listen(PORT, () => {
+server.listen(PORT, '0.0.0.0', () => {
   console.log(`Server running on http://localhost:${PORT}`);
 });
