@@ -34,7 +34,8 @@ const sessionSchema = new mongoose.Schema({
   // A simple list of movie IDs that are a "match"
   matches: [{
     movieId: { type: String },
-    // We can add poster paths, titles, etc., here later
+    title: { type: String },
+    poster_path: { type: String }
   }],
 
 }, {

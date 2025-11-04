@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { motion, AnimatePresence, useAnimationControls } from 'framer-motion';
 // --- Ensure Check and Film icons are imported ---
 import { Users, LogOut, Loader2, Check, X as XIcon, Heart, Film } from 'lucide-react';
@@ -11,6 +11,28 @@ import { initializeSocket, disconnectSocket, socket } from '../lib/socket';
 import MovieSwipeCard from '../components/MovieSwipeCard';
 import MatchModal from '../components/MatchModal';
 import ParallaxBackground from '../components/ParallaxBackground';
+import Logo from '../components/Logo'; // Import the custom Logo component
+
+// --- Header Component for Session Page ---
+const SessionHeader = ({ onLeaveSession }) => {
+  return (
+    <header className="fixed top-0 left-0 right-0 z-50 p-4">
+      <div className="mx-auto flex max-w-7xl items-center justify-between rounded-full border border-white/10 bg-white/5 p-3 px-6 shadow-2xl backdrop-blur-xl">
+        <Link to="/" className="flex items-center gap-2">
+          <Logo className="h-6 w-6 text-white" />
+          <span className="text-xl font-bold text-white">CineMatch</span>
+        </Link>
+        <button
+          onClick={onLeaveSession}
+          className="flex items-center gap-2 rounded-full bg-white/10 px-5 py-2 text-sm font-semibold text-white transition-transform hover:scale-105 hover:bg-white/20"
+        >
+          <LogOut className="h-4 w-4" />
+          Leave Session
+        </button>
+      </div>
+    </header>
+  );
+};
 
 // --- Sidebar Component Definition (Includes Matches Section) ---
 const SessionSidebar = ({ participants = [], joinCode, matches = [] }) => { // Added matches prop
@@ -73,15 +95,20 @@ const SessionSidebar = ({ participants = [], joinCode, matches = [] }) => { // A
         <div className="space-y-3 overflow-y-auto flex-grow"> {/* Takes remaining space */}
           {safeMatches.length > 0 ? (
             safeMatches.map((match) => {
+              // Handle different possible data structures for matches
+              const movieId = match.movieId || match._id || 'unknown';
+              const title = match.title || 'Unknown Title';
+              const posterPath = match.poster_path || null;
+              
               // Construct URL safely for sidebar
-              const matchImageUrl = match.poster_path
-                                  ? `${smallPosterBaseUrl}${match.poster_path}`
+              const matchImageUrl = posterPath
+                                  ? `${smallPosterBaseUrl}${posterPath}`
                                   : placeholderSidebarUrl;
               return (
-                <div key={match.movieId} className="flex items-center gap-3 rounded-lg bg-white/10 p-2">
+                <div key={movieId} className="flex items-center gap-3 rounded-lg bg-white/10 p-2">
                   <img
                     src={matchImageUrl} // Use safe URL
-                    alt={match.title || 'Match'}
+                    alt={title}
                     className="w-10 h-14 object-cover rounded flex-shrink-0 bg-zinc-700" // Added fallback bg
                     // Add onError for sidebar images too
                     onError={(e) => {
@@ -91,7 +118,7 @@ const SessionSidebar = ({ participants = [], joinCode, matches = [] }) => { // A
                     }}
                   />
                   <span className="text-white text-sm font-medium flex-grow truncate">
-                    {match.title || 'Unknown Title'}
+                    {title}
                   </span>
                 </div>
               );
@@ -123,6 +150,10 @@ function SessionPage() {
   const [matches, setMatches] = useState([]);
 
   const controls = useAnimationControls();
+
+  const handleLeaveSession = () => {
+    navigate('/dashboard');
+  };
 
   useEffect(() => {
     if (!token) return navigate('/login');
@@ -236,7 +267,7 @@ function SessionPage() {
 
   if (isLoading) {
      return (
-       <div className="relative flex h-screen w-full flex-col items-center justify-center overflow-hidden p-4 pt-8">
+       <div className="relative flex h-screen w-full flex-col items-center justify-center overflow-hidden p-4 pt-28">
           <ParallaxBackground movies={backgroundMovies} />
           <Loader2 className="h-16 w-16 animate-spin text-white z-10" />
        </div>
@@ -244,7 +275,8 @@ function SessionPage() {
    }
 
   return (
-    <div className="relative flex h-screen w-full flex-col items-center justify-center overflow-hidden p-4 pt-8">
+    <div className="relative flex h-screen w-full flex-col items-center justify-center overflow-hidden p-4 pt-28">
+      <SessionHeader onLeaveSession={handleLeaveSession} />
       <ParallaxBackground movies={backgroundMovies} />
       <div className="z-50">
         <MatchModal show={showMatchModal} movie={matchedMovie} onClose={() => setShowMatchModal(false)} />

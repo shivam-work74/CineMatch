@@ -6,6 +6,7 @@ import { AtSign, Lock, User, UserPlus } from 'lucide-react';
 import Input from '../components/Input';
 import Button from '../components/Button';
 import toast from 'react-hot-toast';
+import Logo from '../components/Logo'; // Import the custom Logo component
 
 // 2. We import our new API client!
 import api from '../lib/api';
@@ -75,7 +76,7 @@ function RegisterPage() {
       >
         <motion.div variants={itemVariants} className="mb-8 text-center">
           <div className="mb-4 inline-flex items-center justify-center rounded-full bg-white/10 p-3">
-            <UserPlus className="h-6 w-6 text-white" />
+            <Logo className="h-6 w-6 text-white" />
           </div>
           <h1 className="text-3xl font-bold text-white">Create Account</h1>
           <p className="text-zinc-300">Join CineMatch to start swiping</p>

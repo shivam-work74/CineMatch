@@ -18,15 +18,25 @@ function MatchModal({ show, movie, onClose }) {
       console.log("[MatchModal] useEffect triggered. Received movie prop:", movie); // Debug log
 
       // --- 3. Validate the incoming 'movie' prop ---
-      if (movie && typeof movie === 'object' && movie.movieId && movie.title) {
+      if (movie && typeof movie === 'object') {
+        // Handle different possible data structures
+        const movieData = {
+          movieId: movie.movieId || movie._id || Date.now(),
+          title: movie.title || 'Unknown Title',
+          poster_path: movie.poster_path || null
+        };
+        
+        // Log the processed data for debugging
+        console.log("[MatchModal] Processed movie data:", movieData);
+        
         // If valid, update the internal state
-        setDisplayMovie(movie);
-        console.log("[MatchModal] Setting internal displayMovie state:", movie); // Debug log
+        setDisplayMovie(movieData);
+        console.log("[MatchModal] Setting internal displayMovie state:", movieData); // Debug log
       } else {
         // If invalid, set internal state to a default "Unknown" structure
         console.warn("[MatchModal] Received invalid movie prop, using fallback:", movie); // Debug log
         setDisplayMovie({
-          movieId: movie?.movieId || Date.now(), // Use a timestamp as fallback key
+          movieId: Date.now(), // Use a timestamp as fallback key
           title: 'Unknown Title',
           poster_path: null // Ensure poster is null
         });
@@ -77,7 +87,7 @@ function MatchModal({ show, movie, onClose }) {
               {/* --- Use displayTitle from internal state --- */}
               <h2 className="mt-4 text-3xl font-bold text-white"> {displayTitle} </h2>
               <img
-                // --- Use imageUrl constructed from internal state ---
+                // --- Use imageUrl constructed from internal state --- 
                 src={imageUrl}
                 alt={displayTitle}
                 className="mt-6 w-64 rounded-lg shadow-2xl bg-zinc-700"

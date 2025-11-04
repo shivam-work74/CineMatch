@@ -9,6 +9,7 @@ import {
   Users, Star, ThumbsUp, ThumbsDown,
   Github, Twitter, Linkedin // <-- NEW ICONS
 } from 'lucide-react';
+import Logo from '../components/Logo'; // Import the custom Logo component
 
 // --- A "Smart" Header Component (Internal to this page) ---
 const Header = () => {
@@ -25,7 +26,7 @@ const Header = () => {
       <div className="mx-auto flex max-w-6xl items-center justify-between rounded-full border border-white/10 bg-white/5 p-3 px-6 shadow-2xl backdrop-blur-xl">
         {/* --- Logo --- */}
         <Link to="/" className="flex items-center gap-2">
-          <Sparkles className="h-6 w-6 text-white" />
+          <Logo className="h-6 w-6 text-white" />
           <span className="text-xl font-bold text-white">CineMatch</span>
         </Link>
         
@@ -489,7 +490,7 @@ function HomePage() {
           {/* Column 1: Brand */}
           <div className="md:col-span-1">
             <Link to="/" className="flex items-center gap-2 mb-4">
-              <Sparkles className="h-6 w-6 text-white" />
+              <Logo className="h-6 w-6 text-white" />
               <span className="text-xl font-bold text-white">CineMatch</span>
             </Link>
             <p className="text-zinc-400 text-sm">

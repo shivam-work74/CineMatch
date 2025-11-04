@@ -2,10 +2,11 @@ import React, { useState } from 'react';
 // 1. We import 'useNavigate'
 import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { AtSign, Lock, LogIn, Sparkles } from 'lucide-react';
+import { AtSign, Lock, LogIn } from 'lucide-react';
 import Input from '../components/Input';
 import Button from '../components/Button';
 import toast from 'react-hot-toast';
+import Logo from '../components/Logo'; // Import the custom Logo component
 
 // 2. We import our API client AND our new auth store!
 import api, { setAuthToken } from '../lib/api';
@@ -83,7 +84,7 @@ function LoginPage() {
       >
         <motion.div variants={itemVariants} className="mb-8 text-center">
           <div className="mb-4 inline-flex items-center justify-center rounded-full bg-white/10 p-3">
-            <Sparkles className="h-6 w-6 text-white" />
+            <Logo className="h-6 w-6 text-white" />
           </div>
           <h1 className="text-3xl font-bold text-white">CineMatch</h1>
           <p className="text-zinc-300">Sign in to find your next great movie</p>

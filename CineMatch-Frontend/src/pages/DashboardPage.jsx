@@ -3,11 +3,12 @@ import { useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { 
   Plus, LogIn, LogOut, Users, HelpCircle, 
-  Sparkles, Film, Clock 
+  Film, Clock 
 } from 'lucide-react';
 import useAuthStore from '../store/authStore';
 import api, { setAuthToken } from '../lib/api';
 import toast from 'react-hot-toast';
+import Logo from '../components/Logo'; // Import the custom Logo component
 
 // We need our reusable components
 import Input from '../components/Input';
@@ -44,7 +45,7 @@ const AppHeader = () => {
     <header className="fixed top-0 left-0 right-0 z-50 p-4">
       <div className="mx-auto flex max-w-7xl items-center justify-between rounded-full border border-white/10 bg-white/5 p-3 px-6 shadow-2xl backdrop-blur-xl">
         <Link to="/" className="flex items-center gap-2">
-          <Sparkles className="h-6 w-6 text-white" />
+          <Logo className="h-6 w-6 text-white" />
           <span className="text-xl font-bold text-white">CineMatch</span>
         </Link>
         <button
