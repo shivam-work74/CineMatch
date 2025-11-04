@@ -40,12 +40,20 @@ const corsOptions = {
     if (!origin) return callback(null, true);
     
     // Get allowed origins from environment variable
-    const allowedOrigins = process.env.FRONTEND_URL 
-      ? process.env.FRONTEND_URL.split(',').map(url => url.trim())
+    const frontendUrl = process.env.FRONTEND_URL;
+    
+    // If FRONTEND_URL is "*", allow all origins
+    if (frontendUrl === "*") {
+      return callback(null, true);
+    }
+    
+    // Handle comma-separated list of origins
+    const allowedOrigins = frontendUrl 
+      ? frontendUrl.split(',').map(url => url.trim())
       : ['http://localhost:5173'];
     
     // Check if the origin is in our allowed list
-    if (allowedOrigins.indexOf(origin) !== -1 || allowedOrigins.indexOf('*') !== -1) {
+    if (allowedOrigins.indexOf(origin) !== -1) {
       callback(null, true);
     } else {
       callback(new Error('Not allowed by CORS'));
@@ -57,7 +65,11 @@ const corsOptions = {
 
 // --- Socket.io Setup ---
 const io = new Server(server, {
-  cors: corsOptions
+  cors: {
+    origin: process.env.FRONTEND_URL === "*" ? "*" : corsOptions.origin,
+    methods: ["GET", "POST"],
+    credentials: true
+  }
 });
 
 // --- Middleware ---
