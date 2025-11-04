@@ -6,6 +6,7 @@ const http = require('http');
 const express = require('express');
 const cors = require('cors');
 const mongoose = require('mongoose');
+const path = require('path');
 const { Server } = require('socket.io');
 
 // --- Import our new files ---
@@ -43,6 +44,16 @@ const io = new Server(server, {
 app.use(cors());
 app.use(express.json());
 
+// --- Serve static files from the React app ---
+if (process.env.NODE_ENV === 'production') {
+  app.use(express.static(path.join(__dirname, '../CineMatch-Frontend/dist')));
+  
+  // Handle React routing, return all requests to React app
+  app.get('*', (req, res) => {
+    res.sendFile(path.join(__dirname, '../CineMatch-Frontend/dist/index.html'));
+  });
+}
+
 // --- API Routes ---
 app.use('/api/auth', authRouter);
 app.use('/api', sessionsRouter);
@@ -74,4 +85,3 @@ initializeSocket(io);
 server.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
 });
-

@@ -2,7 +2,7 @@ import { io } from 'socket.io-client';
 import useAuthStore from '../store/authStore';
 
 // 1. Get the URL of our backend
-const URL = 'http://localhost:3001';
+const URL = import.meta.env.VITE_BACKEND_URL?.replace('/api', '') || 'http://localhost:3001';
 
 // 2. We create the socket instance, but we set 'autoConnect: false'
 //    This is CRITICAL. We do not want to connect until the user

@@ -5,7 +5,7 @@ const api = axios.create({
   // 2. Set the "base URL" to our backend server's address
   //    This way, we can just call `api.post('/auth/login')`
   //    instead of typing the full URL every time.
-  baseURL: 'http://localhost:3001/api',
+  baseURL: import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001/api',
 });
 
 // 3. We'll also add a way to attach our auth token to requests
