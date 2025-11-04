@@ -1,119 +1,74 @@
-// --- Main Server Entry Point (FINAL - MERGED WITH SOCKETS) ---
-// This file connects all our modules together.
+// --- Main Server Entry Point (FINAL CORS FIX) ---
 
-require('dotenv').config(); // Load environment variables from .env file
+require('dotenv').config();
 const http = require('http');
 const express = require('express');
-const cors = require('cors');
+const cors = require('cors'); // Import cors
 const mongoose = require('mongoose');
-const path = require('path');
 const { Server } = require('socket.io');
 
-// --- Import our new files ---
+// Import all our logic
 const { protect } = require('./src/middleware');
 const authRouter = require('./src/auth');
 const sessionsRouter = require('./src/sessions');
-// --- 1. WE IMPORT OUR NEW SOCKET HANDLER ---
 const initializeSocket = require('./src/socketHandler');
 
-// --- Initialization ---
 const app = express();
 const server = http.createServer(app);
-// Use the PORT from environment variables or default to 3001
-const PORT = process.env.PORT || 3001;
+const PORT = process.env.PORT || 10000;
 
 // --- Database Connection ---
 mongoose.connect(process.env.DATABASE_URL)
-  .then(() => {
-    console.log('Successfully connected to MongoDB Atlas!');
-  })
+  .then(() => console.log('Successfully connected to MongoDB Atlas!'))
   .catch((error) => {
-    console.error('Error connecting to MongoDB Atlas:');
-    console.error(error);
+    console.error('Error connecting to MongoDB Atlas:', error);
     process.exit(1);
   });
 
-// --- CORS Configuration ---
+// --- THIS IS THE FINAL, CORRECT CORS FIX ---
 const corsOptions = {
   origin: function (origin, callback) {
-    // Allow requests with no origin (like mobile apps or curl requests)
-    if (!origin) return callback(null, true);
-    
-    // Get allowed origins from environment variable
-    const frontendUrl = process.env.FRONTEND_URL;
-    
-    // If FRONTEND_URL is "*", allow all origins
-    if (frontendUrl === "*") {
-      return callback(null, true);
-    }
-    
-    // Handle comma-separated list of origins
-    const allowedOrigins = frontendUrl 
-      ? frontendUrl.split(',').map(url => url.trim())
-      : ['http://localhost:5173'];
-    
-    // Check if the origin is in our allowed list
-    if (allowedOrigins.indexOf(origin) !== -1) {
+    // 'origin' is the URL of the frontend trying to connect
+    // (e.g., https://cine-match-5o9bjrtey-shivam-s-projects-6c11e3bb.vercel.app)
+
+    // We allow:
+    // 1. No origin (like Postman requests)
+    // 2. Localhost for development
+    // 3. ANY of your Vercel deployment URLs
+    if (!origin || 
+        origin.startsWith("http://localhost:") || 
+        origin.endsWith(".vercel.app")
+    ) {
       callback(null, true);
     } else {
+      console.error(`CORS Error: Origin ${origin} not allowed.`);
       callback(new Error('Not allowed by CORS'));
     }
   },
-  credentials: true,
-  optionsSuccessStatus: 200
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  credentials: true
 };
+
+// --- Middleware ---
+app.use(cors(corsOptions)); // Use the new, flexible CORS options
+app.use(express.json());
 
 // --- Socket.io Setup ---
 const io = new Server(server, {
-  cors: {
-    origin: process.env.FRONTEND_URL === "*" ? "*" : corsOptions.origin,
-    methods: ["GET", "POST"],
-    credentials: true
-  }
+  cors: corsOptions, // Socket.io MUST use the same options
 });
-
-// --- Middleware ---
-app.use(cors(corsOptions));
-app.use(express.json());
-
-// --- Serve static files from the React app ---
-if (process.env.NODE_ENV === 'production') {
-  app.use(express.static(path.join(__dirname, '../CineMatch-Frontend/dist')));
-  
-  // Handle React routing, return all requests to React app
-  app.get('*', (req, res) => {
-    res.sendFile(path.join(__dirname, '../CineMatch-Frontend/dist/index.html'));
-  });
-}
 
 // --- API Routes ---
 app.use('/api/auth', authRouter);
 app.use('/api', sessionsRouter);
-
-// 2. Test Route (Public)
 app.get('/api/test', (req, res) => {
-  res.json({ message: 'Hello from the CineMatch backend!' });
+  res.json({ message: 'Hello from the CineMatch API!' });
 });
 
-// 3. Protected Test Route (Private)
-app.get('/api/protected-test', protect, (req, res) => {
-  res.json({
-    message: `Success! You are logged in.`,
-    user: req.user
-  });
-});
-
-// --- Other Protected Route Stubs (Placeholder) ---
-// ... (this section is fine)
-
-
-// --- 4. SOCKET.IO LOGIC IS NOW PLUGGED IN ---
-// We pass our 'io' server to the handler file,
-// which contains all the 'io.on("connection", ...)' logic.
+// --- Plug in Socket.io Logic ---
 initializeSocket(io);
 
-
 // --- Start Server ---
-server.listen(PORT, '0.0.0.0', () => {
-  console.log(`Server running on http://localhost:${PORT}`);
+server.listen(PORT, () => {
+  console.log(`API Server running on port ${PORT}`);
 });
