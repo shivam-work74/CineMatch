@@ -33,34 +33,35 @@ mongoose.connect(process.env.DATABASE_URL)
     process.exit(1);
   });
 
+// --- CORS Configuration ---
+const corsOptions = {
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    
+    // Get allowed origins from environment variable
+    const allowedOrigins = process.env.FRONTEND_URL 
+      ? process.env.FRONTEND_URL.split(',').map(url => url.trim())
+      : ['http://localhost:5173'];
+    
+    // Check if the origin is in our allowed list
+    if (allowedOrigins.indexOf(origin) !== -1 || allowedOrigins.indexOf('*') !== -1) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true,
+  optionsSuccessStatus: 200
+};
+
 // --- Socket.io Setup ---
 const io = new Server(server, {
-  cors: {
-    origin: getFrontendOrigins(),
-    methods: ["GET", "POST"],
-    credentials: true
-  },
+  cors: corsOptions
 });
 
-// --- CORS Configuration ---
-function getFrontendOrigins() {
-  const frontendUrl = process.env.FRONTEND_URL;
-  if (frontendUrl) {
-    // If FRONTEND_URL contains multiple URLs separated by commas, return array
-    if (frontendUrl.includes(',')) {
-      return frontendUrl.split(',').map(url => url.trim());
-    }
-    return frontendUrl;
-  }
-  // Default to localhost for development
-  return "http://localhost:5173";
-}
-
 // --- Middleware ---
-app.use(cors({
-  origin: getFrontendOrigins(),
-  credentials: true
-}));
+app.use(cors(corsOptions));
 app.use(express.json());
 
 // --- Serve static files from the React app ---
