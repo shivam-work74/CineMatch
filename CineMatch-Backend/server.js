@@ -36,13 +36,31 @@ mongoose.connect(process.env.DATABASE_URL)
 // --- Socket.io Setup ---
 const io = new Server(server, {
   cors: {
-    origin: process.env.FRONTEND_URL || "http://localhost:5173",
+    origin: getFrontendOrigins(),
     methods: ["GET", "POST"],
+    credentials: true
   },
 });
 
+// --- CORS Configuration ---
+function getFrontendOrigins() {
+  const frontendUrl = process.env.FRONTEND_URL;
+  if (frontendUrl) {
+    // If FRONTEND_URL contains multiple URLs separated by commas, return array
+    if (frontendUrl.includes(',')) {
+      return frontendUrl.split(',').map(url => url.trim());
+    }
+    return frontendUrl;
+  }
+  // Default to localhost for development
+  return "http://localhost:5173";
+}
+
 // --- Middleware ---
-app.use(cors());
+app.use(cors({
+  origin: getFrontendOrigins(),
+  credentials: true
+}));
 app.use(express.json());
 
 // --- Serve static files from the React app ---
