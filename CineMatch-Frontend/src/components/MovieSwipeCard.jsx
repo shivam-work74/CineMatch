@@ -1,10 +1,10 @@
 import React from 'react';
 import { motion, useAnimationControls } from 'framer-motion';
-import { ThumbsUp, ThumbsDown } from 'lucide-react';
+import { ThumbsUp, ThumbsDown, Info } from 'lucide-react';
 
 const posterBaseUrl = "https://image.tmdb.org/t/p/w500";
 
-function MovieSwipeCard({ movie, onSwipeRight, onSwipeLeft, controls, index, totalCards }) {
+function MovieSwipeCard({ movie, onSwipeRight, onSwipeLeft, onInfoClick, controls, index, totalCards }) {
 
   const handleDragEnd = (event, info) => {
     const dragX = info.offset.x;
@@ -54,17 +54,35 @@ function MovieSwipeCard({ movie, onSwipeRight, onSwipeLeft, controls, index, tot
       ) : (
         <div className="absolute inset-0 flex items-center justify-center text-zinc-400">No Image</div>
       )}
+
       {imageUrl && (
         <div className="absolute inset-0 z-10 bg-gradient-to-t from-black/80 via-transparent to-black/20 pointer-events-none" />
       )}
+
       <div className="absolute bottom-0 left-0 right-0 p-6 text-white z-20 pointer-events-none">
-        <h2 className="text-3xl font-bold line-clamp-2" style={{ textShadow: '0 2px 10px rgba(0,0,0,0.7)' }}>
-          {movie?.title || "No Title"}
-        </h2>
-        <p className="mt-2 text-sm line-clamp-3" style={{ textShadow: '0 2px 5px rgba(0,0,0,0.5)' }}>
-          {movie?.overview || "No overview available."}
-        </p>
+        <div className="flex items-end justify-between">
+          <div className="flex-grow">
+            <h2 className="text-3xl font-bold line-clamp-2" style={{ textShadow: '0 2px 10px rgba(0,0,0,0.7)' }}>
+              {movie?.title || "No Title"}
+            </h2>
+            <p className="mt-2 text-sm line-clamp-3" style={{ textShadow: '0 2px 5px rgba(0,0,0,0.5)' }}>
+              {movie?.overview || "No overview available."}
+            </p>
+          </div>
+          {/* Info Button */}
+          <button
+            onClick={(e) => {
+              e.stopPropagation(); // Prevent drag start
+              onInfoClick && onInfoClick(movie);
+            }}
+            className="ml-4 flex-shrink-0 rounded-full bg-white/20 p-3 text-white backdrop-blur-md transition-transform hover:scale-110 hover:bg-white/30 pointer-events-auto"
+            aria-label="More Info"
+          >
+            <Info className="h-6 w-6" />
+          </button>
+        </div>
       </div>
+
       <motion.div
         className="absolute top-8 left-8 text-green-400 z-30 pointer-events-none"
         style={{ rotate: -30, opacity: 0 }}

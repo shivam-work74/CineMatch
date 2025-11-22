@@ -1,17 +1,18 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { motion, AnimatePresence, useAnimationControls } from 'framer-motion';
-// --- Ensure Check and Film icons are imported ---
 import { Users, LogOut, Loader2, Check, X as XIcon, Heart, Film } from 'lucide-react';
 import toast from 'react-hot-toast';
+import confetti from 'canvas-confetti';
 
 import useAuthStore from '../store/authStore';
 import api, { setAuthToken } from '../lib/api';
 import { initializeSocket, disconnectSocket, socket } from '../lib/socket';
 import MovieSwipeCard from '../components/MovieSwipeCard';
 import MatchModal from '../components/MatchModal';
-import ParallaxBackground from '../components/ParallaxBackground';
-import Logo from '../components/Logo'; // Import the custom Logo component
+import MovieDetailsModal from '../components/MovieDetailsModal';
+import AnimatedBackground from '../components/AnimatedBackground';
+import Logo from '../components/Logo';
 
 // --- Header Component for Session Page ---
 const SessionHeader = ({ onLeaveSession }) => {
@@ -35,11 +36,11 @@ const SessionHeader = ({ onLeaveSession }) => {
 };
 
 // --- Sidebar Component Definition (Includes Matches Section) ---
-const SessionSidebar = ({ participants = [], joinCode, matches = [] }) => { // Added matches prop
+const SessionSidebar = ({ participants = [], joinCode, matches = [] }) => {
   const safeParticipants = Array.isArray(participants) ? participants : [];
   const safeMatches = Array.isArray(matches) ? matches : [];
-  const smallPosterBaseUrl = "https://image.tmdb.org/t/p/w92"; // Smaller posters for list
-  const placeholderSidebarUrl = "https://placehold.co/92x140/333/555?text=?"; // Placeholder base
+  const smallPosterBaseUrl = "https://image.tmdb.org/t/p/w92";
+  const placeholderSidebarUrl = "https://placehold.co/92x140/333/555?text=?";
 
   return (
     <motion.div
@@ -50,7 +51,7 @@ const SessionSidebar = ({ participants = [], joinCode, matches = [] }) => { // A
     >
       <div className="h-full w-full rounded-2xl border border-white/10
                       bg-white/5 p-6 shadow-2xl backdrop-blur-xl
-                      flex flex-col overflow-hidden" // Added overflow-hidden
+                      flex flex-col overflow-hidden"
       >
         {/* Session Code Section */}
         <h2 className="text-2xl font-bold text-white mb-1">Session Code</h2>
@@ -72,7 +73,7 @@ const SessionSidebar = ({ participants = [], joinCode, matches = [] }) => { // A
           <Users className="h-5 w-5" />
           Participants ({safeParticipants.length})
         </h3>
-        <div className="space-y-3 overflow-y-auto mb-6 flex-shrink-0" style={{ maxHeight: '30vh' }}> {/* Limit height */}
+        <div className="space-y-3 overflow-y-auto mb-6 flex-shrink-0" style={{ maxHeight: '30vh' }}>
           {safeParticipants.length > 0 ? (
             safeParticipants.map((user) => (
               <div key={user?.id || user?.name} className="flex items-center gap-3 rounded-lg bg-white/10 p-3">
@@ -87,34 +88,30 @@ const SessionSidebar = ({ participants = [], joinCode, matches = [] }) => { // A
           )}
         </div>
 
-        {/* --- MERGED: Match List Section --- */}
+        {/* Match List Section */}
         <h3 className="text-xl font-semibold text-white mb-4 flex items-center gap-2 border-t border-white/10 pt-4">
           <Check className="h-5 w-5 text-green-400" />
           Matches ({safeMatches.length})
         </h3>
-        <div className="space-y-3 overflow-y-auto flex-grow"> {/* Takes remaining space */}
+        <div className="space-y-3 overflow-y-auto flex-grow">
           {safeMatches.length > 0 ? (
             safeMatches.map((match) => {
-              // Handle different possible data structures for matches
               const movieId = match.movieId || match._id || 'unknown';
               const title = match.title || 'Unknown Title';
               const posterPath = match.poster_path || null;
-              
-              // Construct URL safely for sidebar
               const matchImageUrl = posterPath
-                                  ? `${smallPosterBaseUrl}${posterPath}`
-                                  : placeholderSidebarUrl;
+                ? `${smallPosterBaseUrl}${posterPath}`
+                : placeholderSidebarUrl;
               return (
                 <div key={movieId} className="flex items-center gap-3 rounded-lg bg-white/10 p-2">
                   <img
-                    src={matchImageUrl} // Use safe URL
+                    src={matchImageUrl}
                     alt={title}
-                    className="w-10 h-14 object-cover rounded flex-shrink-0 bg-zinc-700" // Added fallback bg
-                    // Add onError for sidebar images too
+                    className="w-10 h-14 object-cover rounded flex-shrink-0 bg-zinc-700"
                     onError={(e) => {
-                       if (e.target.src !== placeholderSidebarUrl) {
-                           e.target.src = placeholderSidebarUrl;
-                       }
+                      if (e.target.src !== placeholderSidebarUrl) {
+                        e.target.src = placeholderSidebarUrl;
+                      }
                     }}
                   />
                   <span className="text-white text-sm font-medium flex-grow truncate">
@@ -130,8 +127,7 @@ const SessionSidebar = ({ participants = [], joinCode, matches = [] }) => { // A
       </div>
     </motion.div>
   );
-}; // End SessionSidebar
-
+};
 
 // --- Main Session Page Component ---
 function SessionPage() {
@@ -146,13 +142,32 @@ function SessionPage() {
   const [matchedMovie, setMatchedMovie] = useState(null);
   const [showMatchModal, setShowMatchModal] = useState(false);
   const [backgroundMovies, setBackgroundMovies] = useState([]);
-  // --- MERGED: Add matches state ---
   const [matches, setMatches] = useState([]);
+
+  // --- Details Modal State ---
+  const [showDetailsModal, setShowDetailsModal] = useState(false);
+  const [selectedMovieId, setSelectedMovieId] = useState(null);
 
   const controls = useAnimationControls();
 
   const handleLeaveSession = () => {
     navigate('/dashboard');
+  };
+
+  const handleInfoClick = (movie) => {
+    setSelectedMovieId(movie.id);
+    setShowDetailsModal(true);
+  };
+
+  // --- Audio Helper ---
+  const playAudio = (url) => {
+    try {
+      const audio = new Audio(url);
+      audio.volume = 0.5;
+      audio.play().catch(e => console.warn("Audio playback failed:", e.message));
+    } catch (err) {
+      console.warn("Audio initialization failed:", err.message);
+    }
   };
 
   useEffect(() => {
@@ -167,12 +182,13 @@ function SessionPage() {
         const currentSession = sessionRes.data.session;
         setSession(currentSession);
         setParticipants(currentSession.participants || []);
-        // --- MERGED: Set initial matches ---
         setMatches(currentSession.matches || []);
 
-        const moviesRes = await api.get('/movies/popular');
+        const moviesRes = await api.get('/movies/popular', {
+          params: { genreId: currentSession.genreId }
+        });
+
         const popularMovies = moviesRes.data || [];
-        // Filter out movies already matched
         const matchedMovieIds = new Set((currentSession.matches || []).map(m => m.movieId.toString()));
         const availableMovies = popularMovies.filter(m => !matchedMovieIds.has(m.id.toString()));
 
@@ -191,68 +207,70 @@ function SessionPage() {
     };
     loadSessionData();
 
-    // --- MERGED: Update session_updated listener ---
     socket.on('session_updated', ({ participants: updatedParticipants, matches: currentMatches }) => {
-       setParticipants(updatedParticipants || []);
-       setMatches(currentMatches || []); // Also update matches on join/leave
-       toast('A user updated the session!'); // More generic message
-     });
+      setParticipants(updatedParticipants || []);
+      setMatches(currentMatches || []);
+      toast('A user updated the session!');
+    });
 
-    // --- MERGED: Change to match_update listener ---
     socket.on('match_update', ({ matches: updatedMatches }) => {
       console.log("Match list updated:", updatedMatches);
-      setMatches(updatedMatches || []); // Update state with the full list
+      setMatches(updatedMatches || []);
 
-      // Optionally, still trigger the modal for the NEWEST match
       if (updatedMatches && updatedMatches.length > 0) {
-          const latestMatch = updatedMatches[updatedMatches.length - 1];
-          // Check if this match is different from the currently showing modal movie
-          const previousMatchId = matchedMovie?.movieId; // Store previous before updating
-           if (latestMatch.movieId !== previousMatchId || !showMatchModal) {
-              setMatchedMovie(latestMatch);
-              setShowMatchModal(true);
-              // playMatchSound(); // Optional sound
-          }
+        const latestMatch = updatedMatches[updatedMatches.length - 1];
+        const previousMatchId = matchedMovie?.movieId;
+        if (latestMatch.movieId !== previousMatchId || !showMatchModal) {
+          setMatchedMovie(latestMatch);
+          setShowMatchModal(true);
+
+          confetti({
+            particleCount: 150,
+            spread: 70,
+            origin: { y: 0.6 },
+            colors: ['#FFD700', '#FFA500', '#FF4500', '#00FF00', '#00BFFF']
+          });
+
+          playAudio('https://assets.mixkit.co/active_storage/sfx/2000/2000-preview.mp3');
+        }
       }
     });
-    // Remove old match_found listener if it exists
+
     socket.off('match_found');
 
-    // --- MERGED: Update cleanup ---
     return () => {
       disconnectSocket();
       socket.off('session_updated');
-      socket.off('match_update'); // Use the new event name
+      socket.off('match_update');
     };
-  // Ensure dependencies are correct, avoid infinite loops if state vars are added
   }, [joinCode, token, navigate]);
 
   const handleSwipe = (direction, movie) => {
-     if (!movie || !movie.id) return;
-     setMovies((prevMovies) => {
-        if (!Array.isArray(prevMovies)) return [];
-        const index = prevMovies.findIndex(m => m.id === movie.id);
-        if (index === -1) return prevMovies;
-        return [...prevMovies.slice(0, index), ...prevMovies.slice(index + 1)];
+    if (!movie || !movie.id) return;
+    setMovies((prevMovies) => {
+      if (!Array.isArray(prevMovies)) return [];
+      const index = prevMovies.findIndex(m => m.id === movie.id);
+      if (index === -1) return prevMovies;
+      return [...prevMovies.slice(0, index), ...prevMovies.slice(index + 1)];
     });
-    // Play sound if added
-    // if (direction === 'right') playSwipeRightSound(); else playSwipeLeftSound();
+
     if (direction === 'right') {
-       // Ensure posterPath is null if undefined/missing
-       const posterPathToSend = movie.poster_path || null;
+      const posterPathToSend = movie.poster_path || null;
       socket.emit('send_swipe', {
         joinCode,
         movieId: movie.id.toString(),
         movieTitle: movie.title,
-        posterPath: posterPathToSend, // Send corrected path
+        posterPath: posterPathToSend,
       });
+
+      playAudio('https://assets.mixkit.co/active_storage/sfx/2571/2571-preview.mp3');
     }
   };
 
   const triggerSwipe = async (direction) => {
-     const currentMovies = movies;
-     if (!Array.isArray(currentMovies) || currentMovies.length === 0) return;
-     const topCardMovie = currentMovies[currentMovies.length - 1];
+    const currentMovies = movies;
+    if (!Array.isArray(currentMovies) || currentMovies.length === 0) return;
+    const topCardMovie = currentMovies[currentMovies.length - 1];
     const exitX = direction === 'right' ? 300 : -300;
     try {
       await controls.start({
@@ -260,31 +278,36 @@ function SessionPage() {
         transition: { duration: 0.3, ease: "easeIn" }
       });
       handleSwipe(direction, topCardMovie);
-       controls.start({ x: 0, opacity: 1, scale: 1, transition: { duration: 0 } });
-       controls.set({ y: 0, scale: 1 });
+      controls.start({ x: 0, opacity: 1, scale: 1, transition: { duration: 0 } });
+      controls.set({ y: 0, scale: 1 });
     } catch (error) { handleSwipe(direction, topCardMovie); }
   };
 
   if (isLoading) {
-     return (
-       <div className="relative flex h-screen w-full flex-col items-center justify-center overflow-hidden p-4 pt-28">
-          <ParallaxBackground movies={backgroundMovies} />
-          <Loader2 className="h-16 w-16 animate-spin text-white z-10" />
-       </div>
-     );
-   }
+    return (
+      <AnimatedBackground className="flex h-screen w-full flex-col items-center justify-center overflow-hidden p-4 pt-28">
+        <Loader2 className="h-16 w-16 animate-spin text-white z-10" />
+      </AnimatedBackground>
+    );
+  }
 
   return (
-    <div className="relative flex h-screen w-full flex-col items-center justify-center overflow-hidden p-4 pt-28">
+    <AnimatedBackground className="flex h-screen w-full flex-col items-center justify-center overflow-hidden p-4 pt-28">
       <SessionHeader onLeaveSession={handleLeaveSession} />
-      <ParallaxBackground movies={backgroundMovies} />
+
       <div className="z-50">
         <MatchModal show={showMatchModal} movie={matchedMovie} onClose={() => setShowMatchModal(false)} />
+        <MovieDetailsModal
+          show={showDetailsModal}
+          movieId={selectedMovieId}
+          onClose={() => setShowDetailsModal(false)}
+        />
       </div>
+
       <div className="z-30">
-        {/* --- MERGED: Pass matches state to sidebar --- */}
         <SessionSidebar participants={participants} joinCode={joinCode || ''} matches={matches} />
       </div>
+
       <div className="relative h-[600px] w-full max-w-sm flex-grow flex items-center justify-center z-10">
         <AnimatePresence>
           {movies && movies.length > 0 ? (
@@ -294,38 +317,40 @@ function SessionPage() {
                 movie={movie}
                 onSwipeRight={() => handleSwipe('right', movie)}
                 onSwipeLeft={() => handleSwipe('left', movie)}
+                onInfoClick={handleInfoClick}
                 controls={index === movies.length - 1 ? controls : undefined}
                 index={index}
                 totalCards={movies.length}
               />
             ))
           ) : (
-             <motion.div
-               key="all-done-card"
-               initial={{ opacity: 0, scale: 0.8 }}
-               animate={{ opacity: 1, scale: 1 }}
-               exit={{ opacity: 0, scale: 0.8 }}
-               className="absolute inset-0 h-full w-full rounded-2xl border border-white/10
+            <motion.div
+              key="all-done-card"
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.8 }}
+              className="absolute inset-0 h-full w-full rounded-2xl border border-white/10
                           bg-white/5 p-8 shadow-2xl backdrop-blur-xl
                           flex flex-col items-center justify-center text-center"
-             >
-               <Check className="h-24 w-24 text-green-400 mb-6" />
-               <h2 className="text-3xl font-bold text-white mb-3">All Swiped!</h2>
-               <p className="text-zinc-300">Check the sidebar for matches!</p>
-             </motion.div>
+            >
+              <Check className="h-24 w-24 text-green-400 mb-6" />
+              <h2 className="text-3xl font-bold text-white mb-3">All Swiped!</h2>
+              <p className="text-zinc-300">Check the sidebar for matches!</p>
+            </motion.div>
           )}
         </AnimatePresence>
       </div>
+
       <motion.div
-          className="mt-8 flex gap-6 z-40"
-          initial={{ opacity: 0, y: 50 }}
-          animate={movies.length > 0 ? { opacity: 1, y: 0 } : { opacity: 0, y: 50 }}
-          transition={{ delay: 0.2, duration: 0.5 }}
-        >
+        className="mt-8 flex gap-6 z-40"
+        initial={{ opacity: 0, y: 50 }}
+        animate={movies.length > 0 ? { opacity: 1, y: 0 } : { opacity: 0, y: 50 }}
+        transition={{ delay: 0.2, duration: 0.5 }}
+      >
         <button onClick={() => triggerSwipe('left')} disabled={movies.length === 0} className="flex h-20 w-20 items-center justify-center rounded-full border-2 border-red-500/50 bg-white/5 text-red-400 shadow-xl backdrop-blur-lg transition-all duration-200 hover:scale-110 hover:bg-red-500/20 disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:scale-100" aria-label="Swipe Left (Nope)"> <XIcon className="h-10 w-10" strokeWidth={3} /> </button>
-        <button onClick={() => triggerSwipe('right')} disabled={movies.length === 0} className="flex h-20 w-20 items-center justify-center rounded-full border-2 border-green-500/50 bg-white/5 text-green-400 shadow-xl backdrop-blur-lg transition-all duration-200 hover:scale-110 hover:bg-green-500/20 disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:scale-100" aria-label="Swipe Right (Like)"> <Heart className="h-10 w-10" fill="currentColor" strokeWidth={1}/> </button>
+        <button onClick={() => triggerSwipe('right')} disabled={movies.length === 0} className="flex h-20 w-20 items-center justify-center rounded-full border-2 border-green-500/50 bg-white/5 text-green-400 shadow-xl backdrop-blur-lg transition-all duration-200 hover:scale-110 hover:bg-green-500/20 disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:scale-100" aria-label="Swipe Right (Like)"> <Heart className="h-10 w-10" fill="currentColor" strokeWidth={1} /> </button>
       </motion.div>
-    </div>
+    </AnimatedBackground>
   );
 }
 

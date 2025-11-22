@@ -6,9 +6,20 @@ import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import DashboardPage from './pages/DashboardPage';
 // 1. We import our new SessionPage
-import SessionPage from './pages/SessionPage'; 
+import SessionPage from './pages/SessionPage';
+
+import { useEffect } from 'react';
+import useAuthStore from './store/authStore';
+import { setAuthToken } from './lib/api';
 
 function App() {
+  const { token } = useAuthStore();
+
+  useEffect(() => {
+    if (token) {
+      setAuthToken(token);
+    }
+  }, [token]);
   return (
     <>
       <Toaster
@@ -25,11 +36,11 @@ function App() {
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
         <Route path="/dashboard" element={<DashboardPage />} />
-        
+
         {/* 2. HERE IS OUR NEW, DYNAMIC ROUTE */}
         {/* The ':joinCode' part is a URL parameter */}
         <Route path="/session/:joinCode" element={<SessionPage />} />
-        
+
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>
     </>

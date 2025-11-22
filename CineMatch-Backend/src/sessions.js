@@ -16,21 +16,29 @@ function generateJoinCode() {
 }
 
 // ---
-// 1. GET /api/movies/popular
+// 1. GET /api/movies/popular (Supports ?genreId=...)
 // ---
 router.get('/movies/popular', protect, async (req, res) => {
   try {
     const tmdbApiKey = process.env.TMDB_API_KEY;
-    const url = `https://api.themoviedb.org/3/movie/popular?api_key=${tmdbApiKey}&language=en-US&page=1`;
-    
+    const { genreId } = req.query; // Get genreId from query params
+
+    let url = `https://api.themoviedb.org/3/movie/popular?api_key=${tmdbApiKey}&language=en-US&page=1`;
+
+    // If a genre is specified, use the 'discover' endpoint instead
+    if (genreId) {
+      url = `https://api.themoviedb.org/3/discover/movie?api_key=${tmdbApiKey}&language=en-US&sort_by=popularity.desc&include_adult=false&include_video=false&page=1&with_genres=${genreId}`;
+    }
+
     const response = await axios.get(url);
-    
+
     const movies = response.data.results.map(movie => ({
       id: movie.id,
       title: movie.title,
       poster_path: movie.poster_path,
       overview: movie.overview,
       release_date: movie.release_date,
+      genre_ids: movie.genre_ids,
     }));
 
     res.status(200).json(movies);
@@ -41,13 +49,13 @@ router.get('/movies/popular', protect, async (req, res) => {
   }
 });
 
-
 // ---
 // 2. POST /api/sessions/create
 // ---
 router.post('/sessions/create', protect, async (req, res) => {
   try {
-    const hostId = req.user.id; 
+    const hostId = req.user.id;
+    const { genreId } = req.body; // Get genreId from body
 
     let joinCode;
     let isUnique = false;
@@ -65,11 +73,12 @@ router.post('/sessions/create', protect, async (req, res) => {
       participants: [hostId],
       likes: [],
       matches: [],
+      genreId: genreId || null, // Save the selected genre
     });
 
-    res.status(201).json({ 
+    res.status(201).json({
       message: 'Session created successfully!',
-      session: newSession 
+      session: newSession
     });
 
   } catch (error) {
@@ -92,7 +101,7 @@ router.post('/sessions/join', protect, async (req, res) => {
     }
 
     const session = await Session.findOne({ joinCode: joinCode.toUpperCase() });
-    
+
     if (!session) {
       return res.status(404).json({ message: 'Session not found' });
     }
@@ -101,7 +110,7 @@ router.post('/sessions/join', protect, async (req, res) => {
       session.participants.push(userId);
       await session.save();
     }
-    
+
     // We want to return the full user objects, not just their IDs
     // .populate() "populates" the 'participants' array with the full User documents
     await session.populate('participants', 'id name'); // Only get 'id' and 'name'
@@ -118,19 +127,17 @@ router.post('/sessions/join', protect, async (req, res) => {
 });
 
 // ---
-// 4. *** NEW ENDPOINT ***
-// GET /api/sessions/:joinCode
-// Get the details for a single session
+// 4. GET /api/sessions/:joinCode
 // ---
 router.get('/sessions/:joinCode', protect, async (req, res) => {
   try {
     const { joinCode } = req.params;
     const userId = req.user.id;
 
-    const session = await Session.findOne({ 
-      joinCode: joinCode.toUpperCase() 
+    const session = await Session.findOne({
+      joinCode: joinCode.toUpperCase()
     }).populate('participants', 'id name'); // Get participant details
-    
+
     if (!session) {
       return res.status(404).json({ message: 'Session not found' });
     }

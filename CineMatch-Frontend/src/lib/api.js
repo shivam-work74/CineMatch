@@ -1,11 +1,12 @@
 import axios from 'axios';
+import useAuthStore from '../store/authStore';
 
 // 1. Create a new "instance" of axios
 const api = axios.create({
   // 2. Set the "base URL" to our backend server's address
   //    This way, we can just call `api.post('/auth/login')`
   //    instead of typing the full URL every time.
-  baseURL: import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001/api',
+  baseURL: import.meta.env.VITE_BACKEND_URL || 'http://localhost:10000/api',
 });
 
 // 3. We'll also add a way to attach our auth token to requests
@@ -17,5 +18,19 @@ export const setAuthToken = (token) => {
     delete api.defaults.headers.common['Authorization'];
   }
 };
+
+// 4. Add an interceptor to handle 401 (Unauthorized) errors globally
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response && error.response.status === 401) {
+      // Token is invalid or expired
+      useAuthStore.getState().logout(); // Clear store
+      setAuthToken(null); // Clear header
+      window.location.href = '/login'; // Force redirect
+    }
+    return Promise.reject(error);
+  }
+);
 
 export default api;
